@@ -37,7 +37,8 @@ export class CategoriesController {
     @Query('limit') limit: string,
     @Query('sortBy') sortBy: string,
     @Query('sortOrder') sortOrder: 'asc' | 'desc',
-    @Query('query') query?: string,
+    @Query('search') search?: string,
+    @Query('filters') filters?: string,
   ) {
     const exists = await this.categoriesService.checkCategoryExists(id);
     if (!exists) {
@@ -49,7 +50,8 @@ export class CategoriesController {
       limit: parseInt(limit, 10) || 10,
       sortBy: sortBy || 'id',
       sortOrder: sortOrder || 'asc',
-      query,
+      search,
+      filters: filters,
     });
   }
 

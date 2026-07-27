@@ -46,15 +46,16 @@ export class VehiclesController {
     @Query('limit') limit: string,
     @Query('sortBy') sortBy: string,
     @Query('sortOrder') sortOrder: 'asc' | 'desc',
-    @Query('query') query?: string,
-    // @Query('categoryId') categoryId?: string,
+    @Query('search') search?: string,
+    @Query('filters') filters?: string,
   ) {
     return this.vehiclesService.findAll({
       page: parseInt(page, 10) || 1,
       limit: parseInt(limit, 10) || 10,
       sortBy: sortBy || 'id',
       sortOrder: sortOrder || 'asc',
-      query,
+      search,
+      filters: filters,
     });
   }
 
@@ -76,15 +77,21 @@ export class VehiclesController {
 
   @Get('search/suggestions')
   async suggestions(
-    @Query('query') query: string,
-    @Query('limit') limit: string,
+    @Query('search') search?: string,
+    @Query('query') query?: string,
+    @Query('filters') filters?: string,
+    @Query('limit') limit: number = 5,
   ) {
-    if (!query) {
-      throw new BadRequestException('query parameter is required');
+    const searchTerm = search ?? query;
+
+    if (!searchTerm) {
+      throw new BadRequestException(
+        'search parameter is required (query is supported as a fallback)',
+      );
     }
 
-    const parsedLimit = parseInt(limit, 10) || 5;
-    return this.vehiclesService.suggestions(query, parsedLimit);
+    const parsedLimit = limit || 5;
+    return this.vehiclesService.suggestions(searchTerm, parsedLimit, filters);
   }
 
   @Get(':id')

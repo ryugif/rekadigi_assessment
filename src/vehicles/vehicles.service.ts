@@ -49,17 +49,48 @@ type FilterAttribute =
 export class VehiclesService {
   constructor(private readonly databaseService: DatabaseService) {}
 
-  private parseFilters(query?: string): ListingFilters {
-    if (!query) {
+  private parseFilters(filters?: string): ListingFilters {
+    if (!filters) {
       return {};
     }
 
     try {
-      const parsed = JSON.parse(query) as ListingFilters;
+      const parsed = JSON.parse(filters) as ListingFilters;
       return parsed ?? {};
     } catch {
-      throw new BadRequestException('query must be a valid JSON object string');
+      throw new BadRequestException(
+        'filters must be a valid JSON object string',
+      );
     }
+  }
+
+  private appendSearchCondition(
+    whereClause: string,
+    queryParams: (string | number | boolean)[],
+    search?: string,
+  ): {
+    whereClause: string;
+    queryParams: (string | number | boolean)[];
+  } {
+    const term = search?.trim();
+
+    if (!term) {
+      return { whereClause, queryParams };
+    }
+
+    const searchParam = `%${term}%`;
+    const paramIndex = queryParams.length + 1;
+
+    whereClause += `
+      AND (
+        v.make ILIKE $${paramIndex}
+        OR v.model ILIKE $${paramIndex}
+        OR CONCAT_WS(' ', v.make, v.model) ILIKE $${paramIndex}
+        OR v.location ILIKE $${paramIndex}
+      )`;
+    queryParams.push(searchParam);
+
+    return { whereClause, queryParams };
   }
 
   private appendFilterConditions(filters: ListingFilters | SuggestionFilters): {
@@ -79,6 +110,18 @@ export class VehiclesService {
     if (filters.make) {
       whereClause += ` AND v.make ILIKE $${paramIndex}`;
       queryParams.push(`%${filters.make}%`);
+      paramIndex++;
+    }
+
+    if (filters.model) {
+      whereClause += ` AND v.model ILIKE $${paramIndex}`;
+      queryParams.push(`%${filters.model}%`);
+      paramIndex++;
+    }
+
+    if (filters.city) {
+      whereClause += ` AND v.location ILIKE $${paramIndex}`;
+      queryParams.push(`%${filters.city}%`);
       paramIndex++;
     }
 
@@ -219,13 +262,15 @@ export class VehiclesService {
     limit,
     sortBy,
     sortOrder,
-    query,
+    search,
+    filters,
   }: {
     page: number;
     limit: number;
     sortBy: string;
     sortOrder: 'asc' | 'desc';
-    query?: string;
+    search?: string;
+    filters?: string;
   }) {
     const sortColumnMap: Record<string, string> = {
       id: 'v.id',
@@ -235,8 +280,14 @@ export class VehiclesService {
     };
     const safeSortBy = sortColumnMap[sortBy] ?? 'v.id';
 
-    const filters = this.parseFilters(query);
-    const { whereClause, queryParams } = this.appendFilterConditions(filters);
+    const parsedFilters = this.parseFilters(filters);
+    const { whereClause: baseWhereClause, queryParams: baseQueryParams } =
+      this.appendFilterConditions(parsedFilters);
+    const { whereClause, queryParams } = this.appendSearchCondition(
+      baseWhereClause,
+      baseQueryParams,
+      search,
+    );
 
     const safeSortOrder = sortOrder === 'desc' ? 'DESC' : 'ASC';
 
@@ -293,32 +344,41 @@ export class VehiclesService {
       limit,
       sortBy,
       sortOrder,
-      query,
+      search,
+      filters,
     }: {
       page: number;
       limit: number;
       sortBy: string;
       sortOrder: 'asc' | 'desc';
-      query?: string;
+      search?: string;
+      filters?: string;
     },
   ) {
-    const filters = this.parseFilters(query);
+    const parsedFilters = this.parseFilters(filters);
 
     return this.findAll({
       page,
       limit,
       sortBy,
       sortOrder,
-      query: JSON.stringify({
-        ...filters,
+      search,
+      filters: JSON.stringify({
+        ...parsedFilters,
         categoryId,
       }),
     });
   }
 
-  async suggestions(query: string, limit: number) {
-    const filters = this.parseFilters(query) as SuggestionFilters;
-    const { whereClause, queryParams } = this.appendFilterConditions(filters);
+  async suggestions(search: string, limit: number, filters?: string) {
+    const parsedFilters = this.parseFilters(filters) as SuggestionFilters;
+    const { whereClause: baseWhereClause, queryParams: baseQueryParams } =
+      this.appendFilterConditions(parsedFilters);
+    const { whereClause, queryParams } = this.appendSearchCondition(
+      baseWhereClause,
+      baseQueryParams,
+      search,
+    );
 
     const results = await this.databaseService.query(
       `SELECT
