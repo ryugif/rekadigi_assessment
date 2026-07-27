@@ -286,6 +286,36 @@ export class VehiclesService {
     };
   }
 
+  async findAllByCategoryId(
+    categoryId: string,
+    {
+      page,
+      limit,
+      sortBy,
+      sortOrder,
+      query,
+    }: {
+      page: number;
+      limit: number;
+      sortBy: string;
+      sortOrder: 'asc' | 'desc';
+      query?: string;
+    },
+  ) {
+    const filters = this.parseFilters(query);
+
+    return this.findAll({
+      page,
+      limit,
+      sortBy,
+      sortOrder,
+      query: JSON.stringify({
+        ...filters,
+        categoryId,
+      }),
+    });
+  }
+
   async suggestions(query: string, limit: number) {
     const filters = this.parseFilters(query) as SuggestionFilters;
     const { whereClause, queryParams } = this.appendFilterConditions(filters);

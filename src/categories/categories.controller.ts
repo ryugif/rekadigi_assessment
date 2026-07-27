@@ -1,11 +1,24 @@
-import { Controller, Get, Post, Body, Patch, Param } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Query,
+  NotFoundException,
+} from '@nestjs/common';
 import { CategoriesService } from './categories.service';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
+import { VehiclesService } from '../vehicles/vehicles.service';
 
 @Controller('categories')
 export class CategoriesController {
-  constructor(private readonly categoriesService: CategoriesService) {}
+  constructor(
+    private readonly categoriesService: CategoriesService,
+    private readonly vehiclesService: VehiclesService,
+  ) {}
 
   @Post()
   create(@Body() createCategoryDto: CreateCategoryDto) {
@@ -15,6 +28,29 @@ export class CategoriesController {
   @Get()
   findAll() {
     return this.categoriesService.findAll();
+  }
+
+  @Get(':id/listings')
+  async findListings(
+    @Param('id') id: string,
+    @Query('page') page: string,
+    @Query('limit') limit: string,
+    @Query('sortBy') sortBy: string,
+    @Query('sortOrder') sortOrder: 'asc' | 'desc',
+    @Query('query') query?: string,
+  ) {
+    const exists = await this.categoriesService.checkCategoryExists(id);
+    if (!exists) {
+      throw new NotFoundException(`Category with ID ${id} not found`);
+    }
+
+    return this.vehiclesService.findAllByCategoryId(id, {
+      page: parseInt(page, 10) || 1,
+      limit: parseInt(limit, 10) || 10,
+      sortBy: sortBy || 'id',
+      sortOrder: sortOrder || 'asc',
+      query,
+    });
   }
 
   @Get(':id')
