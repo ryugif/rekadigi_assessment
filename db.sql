@@ -1,7 +1,7 @@
-DROP TYPE vehicle_status;
-DROP TYPE vehicle_condition;
-DROP TYPE vehicle_transmission;
-DROP TYPE vehicle_fuel_type;
+-- DROP TYPE vehicle_status;
+-- DROP TYPE vehicle_condition;
+-- DROP TYPE vehicle_transmission;
+-- DROP TYPE vehicle_fuel_type;
 
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 CREATE EXTENSION IF NOT EXISTS "ltree";
