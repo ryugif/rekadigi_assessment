@@ -177,7 +177,7 @@ export class CategoriesService {
       [categoryId],
     );
 
-    return this.buildCategoryFacetTree(facets || []);
+    return this.buildCategoryFacetTree(facets || [], [categoryId]);
   }
 
   async checkCategoryExists(id: string): Promise<boolean> {
@@ -350,6 +350,7 @@ export class CategoriesService {
 
   private buildCategoryFacetTree(
     facets: CategoryFacetRow[],
+    rootIds?: string[],
   ): CategoryFacetTree[] {
     const nodeMap = new Map<string, CategoryFacetTree>();
 
@@ -374,6 +375,13 @@ export class CategoriesService {
       if (node && parent) {
         parent.children.push(node);
       }
+    }
+
+    // If rootIds are provided, return only those trees
+    if (rootIds?.length) {
+      return rootIds
+        .map((id) => nodeMap.get(id))
+        .filter((node): node is CategoryFacetTree => !!node);
     }
 
     return facets
