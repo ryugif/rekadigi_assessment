@@ -23,6 +23,18 @@ type CategoryTree = {
   children: CategoryTree[];
 };
 
+type CategoryFacetRow = Category & {
+  available_count: number | string;
+};
+
+export type CategoryFacetTree = {
+  id: string;
+  name: string;
+  slug: string;
+  available_count: number;
+  children: CategoryFacetTree[];
+};
+
 @Injectable()
 export class CategoriesService {
   constructor(private readonly databaseService: DatabaseService) {}
@@ -98,6 +110,88 @@ export class CategoriesService {
     return this.buildCategoryTree((categories || []) as Category[]);
   }
 
+  async getAvailableCategoryFacets(): Promise<CategoryFacetTree[]> {
+    const facets = await this.databaseService.query<CategoryFacetRow>(`
+      SELECT
+        c.id,
+        c.name,
+        c.slug,
+        c.parent_id,
+        c.path::text AS path,
+        c.depth,
+        COUNT(v.id)::bigint AS available_count
+      FROM categories c
+      JOIN categories d
+        ON d.path <@ c.path
+      JOIN vehicles v
+        ON v.category_id = d.id
+       AND v.deleted_at IS NULL
+       AND v.status = 'available'
+      GROUP BY
+        c.id,
+        c.name,
+        c.slug,
+        c.parent_id,
+        c.path,
+        c.depth
+      ORDER BY c.path
+    `);
+
+    return this.buildCategoryFacetTree(facets || []);
+  }
+
+  async getAvailableCategoryFacetsByCategoryId(
+    categoryId: string,
+  ): Promise<CategoryFacetTree[]> {
+    const facets = await this.databaseService.query<CategoryFacetRow>(
+      `
+      SELECT
+        c.id,
+        c.name,
+        c.slug,
+        c.parent_id,
+        c.path::text AS path,
+        c.depth,
+        COUNT(v.id)::bigint AS available_count
+      FROM categories c
+      JOIN categories d
+        ON d.path <@ c.path
+      JOIN vehicles v
+        ON v.category_id = d.id
+       AND v.deleted_at IS NULL
+       AND v.status = 'available'
+      WHERE c.path <@ (
+          SELECT path
+          FROM categories
+          WHERE id = $1
+      )
+      GROUP BY
+        c.id,
+        c.name,
+        c.slug,
+        c.parent_id,
+        c.path,
+        c.depth
+      ORDER BY c.path
+    `,
+      [categoryId],
+    );
+
+    return this.buildCategoryFacetTree(facets || []);
+  }
+
+  async checkCategoryExists(id: string): Promise<boolean> {
+    const category = await this.databaseService.query(
+      `
+      SELECT 1
+      FROM categories
+      WHERE id = $1
+      `,
+      [id],
+    );
+    return category.length > 0;
+  }
+
   async findOne(id: string): Promise<Category | undefined> {
     const category = await this.databaseService.query(
       `
@@ -145,7 +239,7 @@ export class CategoriesService {
       throw new NotFoundException(`Category with ID ${id} not found`);
     }
 
-    const slugToUpdate = updateCategoryDto.slug as string | undefined;
+    const slugToUpdate = updateCategoryDto.slug;
     if (slugToUpdate && slugToUpdate !== currentCategory.slug) {
       const existingCategory = await this.findOneBySlug(slugToUpdate);
       if (existingCategory && existingCategory.id !== id) {
@@ -158,8 +252,7 @@ export class CategoriesService {
     let parentCategory: Category | undefined;
     let depth = currentCategory.depth;
     let path = currentCategory.path;
-    const parentIdToUpdate = updateCategoryDto.parent_id as
-      string | null | undefined;
+    const parentIdToUpdate = updateCategoryDto.parent_id;
     if (typeof parentIdToUpdate === 'string') {
       parentCategory = await this.findOne(parentIdToUpdate);
       if (!parentCategory) {
@@ -252,6 +345,40 @@ export class CategoriesService {
     return categories
       .filter((category) => category.parent_id === null)
       .map((category) => nodeMap.get(category.id)!)
+      .filter(Boolean);
+  }
+
+  private buildCategoryFacetTree(
+    facets: CategoryFacetRow[],
+  ): CategoryFacetTree[] {
+    const nodeMap = new Map<string, CategoryFacetTree>();
+
+    for (const facet of facets) {
+      nodeMap.set(facet.id, {
+        id: facet.id,
+        name: facet.name,
+        slug: facet.slug,
+        available_count: Number(facet.available_count),
+        children: [],
+      });
+    }
+
+    for (const facet of facets) {
+      if (!facet.parent_id) {
+        continue;
+      }
+
+      const node = nodeMap.get(facet.id);
+      const parent = nodeMap.get(facet.parent_id);
+
+      if (node && parent) {
+        parent.children.push(node);
+      }
+    }
+
+    return facets
+      .filter((facet) => facet.parent_id === null)
+      .map((facet) => nodeMap.get(facet.id)!)
       .filter(Boolean);
   }
 }
