@@ -1,6 +1,6 @@
 import type { INestApplication } from '@nestjs/common';
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import { createApp } from '../src/app.factory.js';
+import { createApp } from '../src/app.factory';
 
 let appPromise: Promise<INestApplication> | null = null;
 

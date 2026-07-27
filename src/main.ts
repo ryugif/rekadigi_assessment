@@ -1,4 +1,4 @@
-import { createApp } from './app.factory.js';
+import { createApp } from './app.factory';
 
 async function bootstrap() {
   const app = await createApp();
