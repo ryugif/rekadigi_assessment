@@ -24,14 +24,14 @@ type CategoryTree = {
 };
 
 type CategoryFacetRow = Category & {
-  available_count: number | string;
+  count: number | string;
 };
 
 export type CategoryFacetTree = {
   id: string;
   name: string;
   slug: string;
-  available_count: number;
+  count: number;
   children: CategoryFacetTree[];
 };
 
@@ -119,7 +119,7 @@ export class CategoriesService {
         c.parent_id,
         c.path::text AS path,
         c.depth,
-        COUNT(v.id)::bigint AS available_count
+        COUNT(v.id)::bigint AS count
       FROM categories c
       JOIN categories d
         ON d.path <@ c.path
@@ -152,7 +152,7 @@ export class CategoriesService {
         c.parent_id,
         c.path::text AS path,
         c.depth,
-        COUNT(v.id)::bigint AS available_count
+        COUNT(v.id)::bigint AS count
       FROM categories c
       JOIN categories d
         ON d.path <@ c.path
@@ -358,7 +358,7 @@ export class CategoriesService {
         id: facet.id,
         name: facet.name,
         slug: facet.slug,
-        available_count: Number(facet.available_count),
+        count: Number(facet.count),
         children: [],
       });
     }
